@@ -178,35 +178,81 @@ async def predict(file: UploadFile = File(...), heatmap: bool = True):
     prediction. That is a successful assessment with a clinical answer of
     "recapture the image", not an error.
     """
+
+    logger.info("========== PREDICTION REQUEST RECEIVED ==========")
+    logger.info("Filename: %s", file.filename)
+    logger.info("Content type: %s", file.content_type)
+    logger.info("Heatmap requested: %s", heatmap)
+
+    # STEP 1: Get inference engine
+    logger.info("STEP 1: Getting inference engine")
     engine = _require_engine()
-    pil_image, bgr = await _read_image(file)
+    logger.info("STEP 1 COMPLETE: Inference engine ready")
 
     try:
-        return await run_inference(
-            lambda: engine.analyze(pil_image, bgr, want_heatmap=heatmap)
+        # STEP 2: Read and decode image
+        logger.info("STEP 2: Starting image read and decode")
+
+        pil_image, bgr = await _read_image(file)
+
+        logger.info("STEP 2 COMPLETE: Image successfully decoded")
+        logger.info("PIL image size: %s", pil_image.size)
+        logger.info("OpenCV image shape: %s", bgr.shape)
+
+        # STEP 3: Start inference
+        logger.info("STEP 3: Starting model analysis")
+
+        result = await run_inference(
+            lambda: engine.analyze(
+                pil_image,
+                bgr,
+                want_heatmap=heatmap
+            )
         )
+
+        logger.info("STEP 3 COMPLETE: Model analysis finished")
+        logger.info("========== RETURNING PREDICTION RESPONSE ==========")
+
+        return result
+
     except ServiceBusyError as exc:
-        # 503 + Retry-After rather than queueing indefinitely. The Node backend
-        # surfaces this as a retryable error; it never substitutes a result.
+
+        logger.warning(
+            "SERVICE BUSY: %s",
+            exc
+        )
+
         raise HTTPException(
             status_code=503,
             headers={"Retry-After": "5"},
             detail={
                 "error": "service_busy",
-                "message": "The model is at capacity. No analysis was performed — please retry.",
+                "message": (
+                    "The model is at capacity. "
+                    "No analysis was performed — please retry."
+                ),
                 "reason": str(exc),
             },
         )
+
     except Exception as exc:
-        logger.error("Inference failed: %s", exc, exc_info=True)
+
+        logger.error(
+            "INFERENCE FAILED: %s",
+            exc,
+            exc_info=True
+        )
+
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "inference_failed",
-                "message": "Analysis could not be completed. No result was produced.",
+                "message": (
+                    "Analysis could not be completed. "
+                    "No result was produced."
+                ),
             },
         )
-
 
 @app.post("/quality-check")
 async def quality_check(file: UploadFile = File(...)):
