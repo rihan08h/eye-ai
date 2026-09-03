@@ -1,0 +1,19 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+
+# Large ML model files
+*.ckpt
+*.pth
+*.pt
+
+# OS files
+.DS_Store

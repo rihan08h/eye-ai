@@ -1,0 +1,21 @@
+# RETINAAI inference service — runtime dependencies only.
+# The training stack (lightning, hydra, kaggle, tensorboard) is in the
+# repository-root requirements.txt and is not needed to serve predictions.
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.1
+torchvision==0.17.1
+
+# DRModel subclasses lightning.LightningModule, so the import is required
+# even though no training happens here.
+lightning==2.2.1
+torchmetrics==1.2.0
+
+numpy==1.26.2
+pillow==10.2.0
+opencv-python-headless>=4.8.0
+matplotlib>=3.8.0

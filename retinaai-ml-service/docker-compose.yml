@@ -1,0 +1,72 @@
+# RETINAAI — local and single-host deployment.
+#
+#   git lfs install && git lfs pull      # required: the checkpoint is LFS
+#   cp backend/.env.example backend/.env # then set JWT_SECRET
+#   docker compose up --build
+#
+# The backend refuses to start without a real JWT_SECRET. Generate one:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: ml_service/Dockerfile
+    environment:
+      # Inside the compose network only. Do not publish this port: the service
+      # has no authentication because the API is its only client.
+      ML_HOST: 0.0.0.0
+      ML_PORT: 8001
+      # Quality thresholds are provisional and need calibrating on your own
+      # cameras. Override here rather than rebuilding the image.
+      QUALITY_BLUR_MIN: ${QUALITY_BLUR_MIN:-12.0}
+      QUALITY_CONTRAST_MIN: ${QUALITY_CONTRAST_MIN:-12.0}
+    expose:
+      - "8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      # Model load plus warmup takes time on CPU; don't mark unhealthy early.
+      start_period: 120s
+      retries: 3
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 8000
+      MONGODB_URI: ${MONGODB_URI:?MONGODB_URI is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — see the header of this file}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      ML_API_URL: http://ml:8001
+      ML_TIMEOUT_MS: ${ML_TIMEOUT_MS:-45000}
+      USE_MOCK_ML: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Uploads on a named volume so screenings survive a container restart.
+      # For more than one replica this needs to be object storage instead —
+      # a local volume is not shared between hosts.
+      - uploads:/app/uploads
+    depends_on:
+      ml:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  uploads:
