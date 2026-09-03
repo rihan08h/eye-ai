@@ -15,5 +15,8 @@ __pycache__/
 *.pth
 *.pt
 
+# Production model required for cloud deployment
+!dr-model.ckpt
+
 # OS files
 .DS_Store
