@@ -137,12 +137,26 @@ process.on('unhandledRejection', (err) => {
 
 // Graceful shutdown — let in-flight requests finish rather than dropping a
 // screening upload mid-write during a rolling deploy.
+const mongoose = require('mongoose');
+
 const shutdown = (signal) => {
   console.log(`\n${signal} received, shutting down...`);
-  server.close(() => {
-    require('mongoose').connection.close(false, () => process.exit(0));
+
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log('MongoDB connection closed.');
+      process.exit(0);
+    } catch (err) {
+      console.error('Error closing MongoDB connection:', err);
+      process.exit(1);
+    }
   });
-  setTimeout(() => process.exit(1), 10000).unref();
+
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000).unref();
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
