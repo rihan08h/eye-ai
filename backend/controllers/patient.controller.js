@@ -48,7 +48,7 @@ const createPatient = asyncHandler(async (req, res, next) => {
     _id: 'dev_pat_' + Date.now(),
     patientId,
     ...req.body,
-    createdBy: req.user,
+    createdBy: req.user._id,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -66,7 +66,7 @@ const getPatients = asyncHandler(async (req, res) => {
   const { search, page = 1, limit = 20 } = req.query;
 
   if (mongoose.connection.readyState === 1) {
-    const query = {};
+    const query = { createdBy: req.user._id };
     if (search) {
       const searchRegex = new RegExp(search.trim(), 'i');
       query.$or = [
@@ -93,8 +93,10 @@ const getPatients = asyncHandler(async (req, res) => {
     });
   }
 
-  // Dev Store search
-  let filtered = [...devStore.patients];
+  // Dev Store search - strictly isolated to authenticated user
+  let filtered = devStore.patients.filter(
+    (p) => String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
   if (search) {
     const s = search.toLowerCase().trim();
     filtered = filtered.filter(
@@ -124,15 +126,16 @@ const getPatientById = asyncHandler(async (req, res, next) => {
 
   if (mongoose.connection.readyState === 1) {
     let patient;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      patient = await Patient.findById(id).populate('createdBy', 'name role organization');
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
+    if (isObjectId) {
+      patient = await Patient.findOne({ _id: id, createdBy: req.user._id }).populate('createdBy', 'name role organization');
     } else {
-      patient = await Patient.findOne({ patientId: id }).populate('createdBy', 'name role organization');
+      patient = await Patient.findOne({ patientId: id, createdBy: req.user._id }).populate('createdBy', 'name role organization');
     }
 
     if (!patient) return next(new ApiError(404, 'Patient not found'));
 
-    const screenings = await Screening.find({ patient: patient._id })
+    const screenings = await Screening.find({ patient: patient._id, screenedBy: req.user._id })
       .sort({ createdAt: -1 })
       .populate('screenedBy', 'name role');
 
@@ -143,12 +146,18 @@ const getPatientById = asyncHandler(async (req, res, next) => {
     });
   }
 
-  // Dev Store
-  const patient = devStore.patients.find((p) => p._id === id || p.patientId === id);
+  // Dev Store - strictly isolated to authenticated user
+  const patient = devStore.patients.find(
+    (p) =>
+      (p._id === id || p.patientId === id) &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
   if (!patient) return next(new ApiError(404, 'Patient not found'));
 
   const screenings = devStore.screenings.filter(
-    (s) => String(s.patient?._id || s.patient) === String(patient._id)
+    (s) =>
+      String(s.patient?._id || s.patient) === String(patient._id) &&
+      String(s.screenedBy?._id || s.screenedBy) === String(req.user._id)
   );
 
   res.status(200).json({
@@ -160,15 +169,23 @@ const getPatientById = asyncHandler(async (req, res, next) => {
 
 const updatePatient = asyncHandler(async (req, res, next) => {
   if (mongoose.connection.readyState === 1) {
-    const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const patient = await Patient.findOneAndUpdate(
+      { _id: req.params.id, createdBy: req.user._id },
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
     if (!patient) return next(new ApiError(404, 'Patient not found'));
     return res.status(200).json({ success: true, patient });
   }
 
-  const idx = devStore.patients.findIndex((p) => p._id === req.params.id);
+  const idx = devStore.patients.findIndex(
+    (p) =>
+      p._id === req.params.id &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
   if (idx === -1) return next(new ApiError(404, 'Patient not found'));
 
   devStore.patients[idx] = { ...devStore.patients[idx], ...req.body, updatedAt: new Date() };
@@ -177,12 +194,27 @@ const updatePatient = asyncHandler(async (req, res, next) => {
 
 const deletePatient = asyncHandler(async (req, res, next) => {
   if (mongoose.connection.readyState === 1) {
-    const patient = await Patient.findByIdAndDelete(req.params.id);
+    const patient = await Patient.findOneAndDelete({ _id: req.params.id, createdBy: req.user._id });
     if (!patient) return next(new ApiError(404, 'Patient not found'));
+    await Screening.deleteMany({ patient: patient._id, screenedBy: req.user._id });
     return res.status(200).json({ success: true, message: 'Patient record deleted' });
   }
 
-  devStore.patients = devStore.patients.filter((p) => p._id !== req.params.id);
+  const idx = devStore.patients.findIndex(
+    (p) =>
+      p._id === req.params.id &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
+  if (idx === -1) return next(new ApiError(404, 'Patient not found'));
+
+  devStore.patients.splice(idx, 1);
+  devStore.screenings = devStore.screenings.filter(
+    (s) =>
+      !(
+        String(s.screenedBy?._id || s.screenedBy) === String(req.user._id) &&
+        String(s.patient?._id || s.patient) === String(req.params.id)
+      )
+  );
   res.status(200).json({ success: true, message: 'Patient record deleted' });
 });
 

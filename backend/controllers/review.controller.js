@@ -53,7 +53,7 @@ const createReview = asyncHandler(async (req, res, next) => {
     );
   }
 
-  const screening = await Screening.findById(screeningId);
+  const screening = await Screening.findOne({ _id: screeningId, screenedBy: req.user._id });
   if (!screening) {
     return next(new ApiError(404, 'Screening not found.'));
   }
@@ -179,9 +179,14 @@ const getReviewQueue = asyncHandler(async (req, res) => {
  * GET /api/reviews/screening/:screeningId
  * Full review history for one screening, newest first.
  */
-const getReviewsForScreening = asyncHandler(async (req, res) => {
+const getReviewsForScreening = asyncHandler(async (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
     return res.status(200).json({ success: true, reviews: [], degraded: true });
+  }
+
+  const screening = await Screening.findOne({ _id: req.params.screeningId, screenedBy: req.user._id });
+  if (!screening) {
+    return next(new ApiError(404, 'Screening record not found'));
   }
 
   const reviews = await ClinicianReview.find({ screening: req.params.screeningId })

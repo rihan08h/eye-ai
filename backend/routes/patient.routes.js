@@ -25,6 +25,6 @@ router
   .route('/:id')
   .get(getPatientById)
   .put(patientValidation, checkValidation, updatePatient)
-  .delete(allowRoles('admin'), deletePatient);
+  .delete(deletePatient);
 
 module.exports = router;

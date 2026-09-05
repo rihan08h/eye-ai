@@ -13,15 +13,25 @@ const createReferral = asyncHandler(async (req, res, next) => {
   }
 
   if (mongoose.connection.readyState === 1) {
+    const isObjectId = mongoose.Types.ObjectId.isValid(patient) && /^[0-9a-fA-F]{24}$/.test(patient);
+    const pat = isObjectId
+      ? await Patient.findOne({ _id: patient, createdBy: req.user._id })
+      : await Patient.findOne({ patientId: patient, createdBy: req.user._id });
+    if (!pat) return next(new ApiError(404, 'Patient not found.'));
+
+    const scr = await Screening.findOne({ _id: screening, screenedBy: req.user._id });
+    if (!scr) return next(new ApiError(404, 'Screening not found.'));
+
     const existing = await Referral.findOne({
-      screening,
+      screening: scr._id,
+      createdBy: req.user._id,
       status: { $in: ['Pending', 'Under Review', 'Appointment Scheduled'] },
     });
     if (existing) return next(new ApiError(409, 'An active referral already exists for this screening'));
 
     const referral = await Referral.create({
-      patient,
-      screening,
+      patient: pat._id,
+      screening: scr._id,
       createdBy: req.user._id,
       assignedDoctor,
       priority,
@@ -30,7 +40,7 @@ const createReferral = asyncHandler(async (req, res, next) => {
       notes,
     });
 
-    await Screening.findByIdAndUpdate(screening, { referralCreated: true });
+    await Screening.findOneAndUpdate({ _id: scr._id, screenedBy: req.user._id }, { referralCreated: true });
 
     const populated = await Referral.findById(referral._id)
       .populate('patient')
@@ -42,12 +52,17 @@ const createReferral = asyncHandler(async (req, res, next) => {
   }
 
   // Dev Store
-  const patObj = devStore.patients.find((p) => p._id === patient || p.patientId === patient);
-  const scrObj = devStore.screenings.find((s) => s._id === screening);
+  const patObj = devStore.patients.find(
+    (p) =>
+      (p._id === patient || p.patientId === patient) &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
+  const scrObj = devStore.screenings.find(
+    (s) =>
+      s._id === screening &&
+      String(s.screenedBy?._id || s.screenedBy) === String(req.user._id)
+  );
 
-  // Previously this defaulted a missing screening to { prediction: 'Severe' },
-  // which meant a referral for a screening that does not exist was created
-  // carrying an invented sight-threatening diagnosis. Fail instead.
   if (!patObj) {
     return next(new ApiError(404, 'Patient not found.'));
   }
@@ -61,7 +76,7 @@ const createReferral = asyncHandler(async (req, res, next) => {
     _id: 'dev_ref_' + Date.now(),
     patient: patObj,
     screening: scrObj,
-    createdBy: req.user,
+    createdBy: req.user._id,
     assignedDoctor: devStore.users.find((u) => u.role === 'doctor') || req.user,
     priority,
     status: 'Pending',
@@ -80,7 +95,7 @@ const getReferrals = asyncHandler(async (req, res) => {
   const { status, priority, page = 1, limit = 20 } = req.query;
 
   if (mongoose.connection.readyState === 1) {
-    const query = {};
+    const query = { createdBy: req.user._id };
     if (status) query.status = status;
     if (priority) query.priority = priority;
 
@@ -98,8 +113,10 @@ const getReferrals = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true, total, page: Number(page), referrals });
   }
 
-  // Dev Store
-  let filtered = [...devStore.referrals];
+  // Dev Store - strictly isolated to current user
+  let filtered = devStore.referrals.filter(
+    (r) => String(r.createdBy?._id || r.createdBy) === String(req.user._id)
+  );
   if (status) filtered = filtered.filter((r) => r.status === status);
   if (priority) filtered = filtered.filter((r) => r.priority === priority);
 
@@ -114,7 +131,7 @@ const getReferrals = asyncHandler(async (req, res) => {
 
 const getReferralById = asyncHandler(async (req, res, next) => {
   if (mongoose.connection.readyState === 1) {
-    const referral = await Referral.findById(req.params.id)
+    const referral = await Referral.findOne({ _id: req.params.id, createdBy: req.user._id })
       .populate('patient')
       .populate('screening')
       .populate('createdBy', 'name role')
@@ -123,7 +140,11 @@ const getReferralById = asyncHandler(async (req, res, next) => {
     return res.status(200).json({ success: true, referral });
   }
 
-  const referral = devStore.referrals.find((r) => r._id === req.params.id);
+  const referral = devStore.referrals.find(
+    (r) =>
+      r._id === req.params.id &&
+      String(r.createdBy?._id || r.createdBy) === String(req.user._id)
+  );
   if (!referral) return next(new ApiError(404, 'Referral not found'));
   res.status(200).json({ success: true, referral });
 });
@@ -132,8 +153,8 @@ const updateReferralStatus = asyncHandler(async (req, res, next) => {
   const { status, doctorFeedback, finalDiagnosis } = req.body;
 
   if (mongoose.connection.readyState === 1) {
-    const referral = await Referral.findByIdAndUpdate(
-      req.params.id,
+    const referral = await Referral.findOneAndUpdate(
+      { _id: req.params.id, createdBy: req.user._id },
       { status, doctorFeedback, finalDiagnosis },
       { new: true }
     )
@@ -143,7 +164,11 @@ const updateReferralStatus = asyncHandler(async (req, res, next) => {
     return res.status(200).json({ success: true, message: 'Status updated', referral });
   }
 
-  const ref = devStore.referrals.find((r) => r._id === req.params.id);
+  const ref = devStore.referrals.find(
+    (r) =>
+      r._id === req.params.id &&
+      String(r.createdBy?._id || r.createdBy) === String(req.user._id)
+  );
   if (!ref) return next(new ApiError(404, 'Referral not found'));
 
   if (status) ref.status = status;

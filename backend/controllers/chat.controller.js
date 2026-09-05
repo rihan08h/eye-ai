@@ -13,7 +13,7 @@ const handleChat = asyncHandler(async (req, res, next) => {
     return next(new ApiError(400, 'Please provide a valid question or message'));
   }
 
-  const reply = await getEducationalChatResponse(message.trim(), screeningId);
+  const reply = await getEducationalChatResponse(message.trim(), screeningId, req.user._id);
 
   res.status(200).json({
     success: true,

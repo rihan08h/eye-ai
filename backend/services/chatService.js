@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const axios = require('axios');
 const Screening = require('../models/Screening');
+const devStore = require('../utils/devStore');
 
 /**
  * Curated clinical knowledge base for educational queries
@@ -58,12 +60,23 @@ It highlights the exact regions in the retinal fundus image that influenced the 
 /**
  * Handle educational eye health chat
  */
-const getEducationalChatResponse = async (message, screeningId) => {
+const getEducationalChatResponse = async (message, screeningId, userId) => {
   let screeningContext = '';
 
-  if (screeningId) {
+  if (screeningId && userId) {
     try {
-      const screening = await Screening.findById(screeningId).populate('patient', 'name age gender');
+      let screening;
+      if (mongoose.connection.readyState === 1) {
+        screening = await Screening.findOne({ _id: screeningId, screenedBy: userId }).populate('patient', 'name age gender');
+      } else {
+        const s = devStore.screenings.find(
+          (sc) =>
+            sc._id === screeningId &&
+            String(sc.screenedBy?._id || sc.screenedBy) === String(userId)
+        );
+        if (s) screening = s;
+      }
+
       if (screening) {
         screeningContext = `\n\nPatient Screening Context:\n• Patient: ${screening.patient?.name || 'Patient'} (${screening.patient?.age || 'N/A'} yo ${screening.patient?.gender || ''})\n• Prediction: ${screening.prediction}\n• Confidence: ${(screening.confidence * 100).toFixed(1)}%\n• Risk Level: ${screening.riskLevel?.toUpperCase()}\n• Image Quality: ${screening.imageQuality?.status}`;
       }

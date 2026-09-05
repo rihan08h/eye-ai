@@ -58,10 +58,11 @@ const createScreening = asyncHandler(async (req, res, next) => {
   // If MongoDB is connected
   if (mongoose.connection.readyState === 1) {
     let patient;
-    if (patientId.match(/^[0-9a-fA-F]{24}$/)) {
-      patient = await Patient.findById(patientId);
+    const isObjectId = mongoose.Types.ObjectId.isValid(patientId) && /^[0-9a-fA-F]{24}$/.test(patientId);
+    if (isObjectId) {
+      patient = await Patient.findOne({ _id: patientId, createdBy: req.user._id });
     } else {
-      patient = await Patient.findOne({ patientId });
+      patient = await Patient.findOne({ patientId, createdBy: req.user._id });
     }
 
     if (!patient) return next(new ApiError(404, 'Patient not found.'));
@@ -87,14 +88,18 @@ const createScreening = asyncHandler(async (req, res, next) => {
     });
   }
 
-  // Dev Store
-  const patient = devStore.patients.find((p) => p._id === patientId || p.patientId === patientId);
+  // Dev Store - verify patient belongs to current user
+  const patient = devStore.patients.find(
+    (p) =>
+      (p._id === patientId || p.patientId === patientId) &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
   if (!patient) return next(new ApiError(404, 'Patient not found.'));
 
   const newScreening = {
     _id: 'dev_screen_' + Date.now(),
     patient,
-    screenedBy: req.user,
+    screenedBy: req.user._id,
     ...analysisFields,
     referralCreated: false,
     eyeSide: eyeSide || 'Right Eye (OD)',
@@ -117,13 +122,14 @@ const getScreenings = asyncHandler(async (req, res) => {
   const { riskLevel, prediction, search, page = 1, limit = 20 } = req.query;
 
   if (mongoose.connection.readyState === 1) {
-    const query = {};
+    const query = { screenedBy: req.user._id };
     if (riskLevel) query.riskLevel = riskLevel;
     if (prediction) query.prediction = prediction;
 
     if (search) {
       const searchRegex = new RegExp(search.trim(), 'i');
       const matchedPatients = await Patient.find({
+        createdBy: req.user._id,
         $or: [{ name: searchRegex }, { patientId: searchRegex }, { phone: searchRegex }],
       }).select('_id');
       query.patient = { $in: matchedPatients.map((p) => p._id) };
@@ -147,8 +153,10 @@ const getScreenings = asyncHandler(async (req, res) => {
     });
   }
 
-  // Dev Store
-  let filtered = [...devStore.screenings];
+  // Dev Store - strictly isolated to current user
+  let filtered = devStore.screenings.filter(
+    (s) => String(s.screenedBy?._id || s.screenedBy) === String(req.user._id)
+  );
   if (riskLevel) filtered = filtered.filter((s) => s.riskLevel === riskLevel);
   if (prediction) filtered = filtered.filter((s) => s.prediction === prediction);
   if (search) {
@@ -177,7 +185,7 @@ const getScreeningById = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
   if (mongoose.connection.readyState === 1) {
-    const screening = await Screening.findById(id)
+    const screening = await Screening.findOne({ _id: id, screenedBy: req.user._id })
       .populate('patient')
       .populate('screenedBy', 'name role organization phone')
       .populate('screeningCamp', 'name location village');
@@ -189,7 +197,11 @@ const getScreeningById = asyncHandler(async (req, res, next) => {
   }
 
   // Dev Store
-  const screening = devStore.screenings.find((s) => s._id === id);
+  const screening = devStore.screenings.find(
+    (s) =>
+      s._id === id &&
+      String(s.screenedBy?._id || s.screenedBy) === String(req.user._id)
+  );
   if (!screening) return next(new ApiError(404, 'Screening record not found'));
 
   const riskMeta = getRiskForPrediction(screening.prediction);
@@ -201,26 +213,34 @@ const getPatientScreenings = asyncHandler(async (req, res, next) => {
 
   if (mongoose.connection.readyState === 1) {
     let patient;
-    if (patientId.match(/^[0-9a-fA-F]{24}$/)) {
-      patient = await Patient.findById(patientId);
+    const isObjectId = mongoose.Types.ObjectId.isValid(patientId) && /^[0-9a-fA-F]{24}$/.test(patientId);
+    if (isObjectId) {
+      patient = await Patient.findOne({ _id: patientId, createdBy: req.user._id });
     } else {
-      patient = await Patient.findOne({ patientId });
+      patient = await Patient.findOne({ patientId, createdBy: req.user._id });
     }
 
     if (!patient) return next(new ApiError(404, 'Patient not found'));
 
-    const screenings = await Screening.find({ patient: patient._id })
+    const screenings = await Screening.find({ patient: patient._id, screenedBy: req.user._id })
       .sort({ createdAt: -1 })
       .populate('screenedBy', 'name role');
 
     return res.status(200).json({ success: true, patient, screenings });
   }
 
-  const patient = devStore.patients.find((p) => p._id === patientId || p.patientId === patientId);
+  // Dev Store
+  const patient = devStore.patients.find(
+    (p) =>
+      (p._id === patientId || p.patientId === patientId) &&
+      String(p.createdBy?._id || p.createdBy) === String(req.user._id)
+  );
   if (!patient) return next(new ApiError(404, 'Patient not found'));
 
   const screenings = devStore.screenings.filter(
-    (s) => String(s.patient?._id || s.patient) === String(patient._id)
+    (s) =>
+      String(s.patient?._id || s.patient) === String(patient._id) &&
+      String(s.screenedBy?._id || s.screenedBy) === String(req.user._id)
   );
 
   res.status(200).json({ success: true, patient, screenings });
