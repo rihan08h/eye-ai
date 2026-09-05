@@ -57,7 +57,11 @@ export default function AppRouter() {
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/signup" element={<Register />} />
         </Route>
+
+        <Route path="/screening" element={<Navigate to="/screenings/new" replace />} />
+        <Route path="/pilot" element={<Navigate to="/login" replace />} />
 
         {/* ── Protected Application Routes ── */}
         <Route element={<PrivateRoute />}>

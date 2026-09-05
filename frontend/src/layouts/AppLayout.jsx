@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { NavLink, useNavigate, Outlet, Link } from 'react-router-dom';
 import { prefetchProps } from '../lib/prefetch';
 import {
-  Activity, LayoutDashboard, Users, ScanEye, ClipboardList,
+  LayoutDashboard, Users, ScanEye, ClipboardList,
   GitBranch, Tent, BarChart3, FileText, Bot, Settings,
-  LogOut, Menu, X, ChevronRight, Globe, Wifi, WifiOff, Sparkles
+  LogOut, Menu, X, Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -26,10 +26,19 @@ const NAV_ITEMS = [
 ];
 
 const ROLE_BADGE = {
-  healthworker: { label: 'Health Worker', color: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' },
-  doctor: { label: 'Doctor / Specialist', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/30' },
-  admin: { label: 'Admin', color: 'bg-purple-500/10 text-purple-400 border border-purple-500/30' },
+  healthworker: { label: 'Health Worker', color: 'bg-[#34c98c]/10 text-[#34c98c] border border-[#34c98c]/25' },
+  doctor: { label: 'Doctor / Specialist', color: 'bg-[#3d6ee8]/10 text-[#3d6ee8] border border-[#3d6ee8]/25' },
+  admin: { label: 'Admin', color: 'bg-[#8b5cf6]/10 text-[#8b5cf6] border border-[#8b5cf6]/25' },
 };
+
+const Mark = ({ size = 26 }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <path d="M2 16c4.4-6.7 8.9-10 13.6-10S24.9 9.3 30 16c-4.7 6.7-9.4 10-14.2 10S6.4 22.7 2 16Z"
+      stroke="#18b8d4" strokeWidth="1.6" strokeLinejoin="round" />
+    <circle cx="16" cy="16" r="5.1" stroke="#18b8d4" strokeWidth="1.6" />
+    <circle cx="16" cy="16" r="1.9" fill="#3d6ee8" />
+  </svg>
+);
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -51,26 +60,24 @@ export default function AppLayout() {
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(user?.role || 'healthworker'));
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-[#060b17] border-r border-slate-800/80">
-      {/* Brand Logo Header */}
-      <Link to="/" className="flex items-center gap-3 px-5 py-5 border-b border-slate-800/80 group">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/20 border border-cyan-300/30 group-hover:scale-105 transition-transform">
-          <Activity className="w-5 h-5 text-white" />
-        </div>
+    <div className="flex flex-col h-full bg-[#071014] border-r border-white/[0.085]">
+      {/* Brand Header */}
+      <Link to="/" className="flex items-center gap-3 px-5 py-5 border-b border-white/[0.085] group transition-opacity hover:opacity-90">
+        <Mark size={28} />
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="text-white font-black text-base tracking-tight group-hover:text-cyan-400 transition-colors">
-              RetinaAI
+            <span className="text-[#f2f6f7] font-bold text-base tracking-tight">
+              Retina<em className="text-[#18b8d4] not-italic">AI</em>
             </span>
-            <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1 py-0.2 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              HUD
+            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-full bg-[#18b8d4]/10 text-[#18b8d4] border border-[#18b8d4]/20">
+              CLINICAL
             </span>
           </div>
-          <p className="text-slate-400 text-[10px]">Explainable Clinical Platform</p>
+          <p className="text-[#6f8188] text-[11px] font-medium tracking-wide">Explainable Screening</p>
         </div>
       </Link>
 
-      {/* Navigation List */}
+      {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-none">
         {visibleNav.map((item) => {
           const Icon = item.icon;
@@ -84,20 +91,20 @@ export default function AppLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group ${
                   isActive
-                    ? 'bg-gradient-to-r from-cyan-500/20 via-blue-600/20 to-transparent text-white border border-cyan-500/40 shadow-[0_0_20px_-5px_rgba(6,182,212,0.3)]'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
+                    ? 'bg-[#18b8d4]/10 text-[#18b8d4] border border-[#18b8d4]/25'
+                    : 'text-[#a3b1b7] hover:text-[#f2f6f7] hover:bg-white/[0.04] border border-transparent'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
                   <Icon
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                      isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-cyan-400'
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive ? 'text-[#18b8d4]' : 'text-[#6f8188] group-hover:text-[#a3b1b7]'
                     }`}
                   />
                   <span className="flex-1 tracking-wide">{t(item.key) || item.label}</span>
-                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-cyan-400 opacity-80" />}
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#18b8d4] shrink-0" />}
                 </>
               )}
             </NavLink>
@@ -105,15 +112,15 @@ export default function AppLayout() {
         })}
       </nav>
 
-      {/* User Profile at bottom */}
-      <div className="border-t border-slate-800/80 p-4 bg-slate-950/40">
+      {/* User Profile at Bottom */}
+      <div className="border-t border-white/[0.085] p-4 bg-[#0a161b]/60">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-black text-xs shrink-0 shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-[#0f1d23] border border-white/[0.12] text-[#18b8d4] font-bold text-xs flex items-center justify-center shrink-0">
             {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-bold truncate">{user?.name || 'Clinician'}</p>
-            <span className={`inline-block text-[10px] px-2 py-0.5 rounded-md font-semibold mt-0.5 ${ROLE_BADGE[user?.role]?.color || ROLE_BADGE.healthworker.color}`}>
+            <p className="text-[#f2f6f7] text-xs font-semibold truncate">{user?.name || 'Clinician'}</p>
+            <span className={`inline-block text-[10px] px-2 py-0.5 rounded-md font-medium mt-0.5 ${ROLE_BADGE[user?.role]?.color || ROLE_BADGE.healthworker.color}`}>
               {ROLE_BADGE[user?.role]?.label || 'Health Worker'}
             </span>
           </div>
@@ -121,7 +128,7 @@ export default function AppLayout() {
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition text-xs font-medium cursor-pointer"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[#a3b1b7] hover:text-[#ef5b5b] hover:bg-[#ef5b5b]/10 transition text-xs font-medium cursor-pointer"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign out
@@ -131,7 +138,7 @@ export default function AppLayout() {
   );
 
   return (
-    <div className="flex h-screen bg-[#030712] text-slate-100 overflow-hidden font-sans bg-grid-cyber">
+    <div className="flex h-screen bg-[#071014] text-[#f2f6f7] overflow-hidden font-sans bg-grid-cyber">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-64 shrink-0 relative z-20">
         <SidebarContent />
@@ -146,7 +153,7 @@ export default function AppLayout() {
           />
           <aside className="relative z-10 flex flex-col w-64 shadow-2xl">
             <button
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+              className="absolute top-4 right-4 text-[#a3b1b7] hover:text-[#f2f6f7] p-1"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -159,65 +166,65 @@ export default function AppLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-[#060b17]/80 backdrop-blur-xl border-b border-slate-800/80 flex items-center justify-between px-4 lg:px-8 shrink-0 z-10">
+        <header className="h-16 bg-[#071014]/90 backdrop-blur-md border-b border-white/[0.085] flex items-center justify-between px-4 lg:px-8 shrink-0 z-10">
           <button
-            className="lg:hidden text-slate-400 hover:text-white transition p-1.5 rounded-lg bg-slate-900 border border-slate-800"
+            className="lg:hidden text-[#a3b1b7] hover:text-[#f2f6f7] transition p-1.5 rounded-lg bg-[#0f1d23] border border-white/[0.085]"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="w-5 h-5" />
           </button>
 
           <div className="hidden sm:flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-slate-300 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              {user?.organization || 'Rural Health Centre'}
+            <span className="text-xs font-medium text-[#f2f6f7] bg-[#0f1d23] border border-white/[0.085] px-3 py-1.5 rounded-full flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#34c98c] shadow-[0_0_8px_#34c98c]" />
+              {user?.organization || 'District Hospital'}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Multilingual Quick Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2 py-1 rounded-xl">
-              <Globe className="w-3.5 h-3.5 text-cyan-400 ml-1" />
+            {/* Multilingual Selector */}
+            <div className="flex items-center gap-1.5 bg-[#0f1d23] border border-white/[0.085] px-2.5 py-1.5 rounded-full">
+              <Globe className="w-3.5 h-3.5 text-[#18b8d4]" />
               <select
                 value={currentLang}
                 onChange={(e) => changeLanguage(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-slate-300 focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-xs font-medium text-[#f2f6f7] focus:outline-none cursor-pointer pr-1"
               >
                 {languages.map((l) => (
-                  <option key={l.code} value={l.code} className="bg-slate-900 text-white">
+                  <option key={l.code} value={l.code} className="bg-[#0f1d23] text-white">
                     {l.native}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Network / Offline Status Pill */}
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
+            {/* Network Status */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
               isOnline
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                ? 'bg-[#34c98c]/10 text-[#34c98c] border-[#34c98c]/25'
+                : 'bg-[#ef5b5b]/10 text-[#ef5b5b] border-[#ef5b5b]/25'
             }`}>
-              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-              <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline Mode'}</span>
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#34c98c]' : 'bg-[#ef5b5b]'}`} />
+              <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline'}</span>
               {pendingCount > 0 && (
-                <span className="bg-cyan-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
+                <span className="bg-[#18b8d4] text-[#03212a] text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
                   {pendingCount} queued
                 </span>
               )}
             </div>
 
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-black text-xs shadow-md">
+            <div className="w-8 h-8 rounded-full bg-[#0f1d23] border border-white/[0.12] flex items-center justify-center text-[#18b8d4] font-bold text-xs">
               {user?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
           </div>
         </header>
 
-        {/* Offline Banner if disconnected or pending queue */}
+        {/* Offline Notification Banner */}
         <OfflineBanner />
 
-        {/* Page Content Stream with spacious breathing room */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#030712]/70">
+        {/* Page View Stream */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#071014]">
           <div className="max-w-7xl mx-auto space-y-8">
             <Outlet />
           </div>
